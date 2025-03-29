@@ -1,52 +1,58 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CalendarIcon, Clock, FileText, Upload } from "lucide-react";
+import { BookOpen, GraduationCap, Users, Video } from "lucide-react";
 
 export default function Home() {
   return (
     <div className="container mx-auto px-4 py-10">
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Assignments</h1>
-            <p className="text-muted-foreground">View and submit your course assignments</p>
-          </div>
-          <Button asChild>
-            <Link href="/assignments/new">
-              <Upload className="mr-2 h-4 w-4" />
-              New Submission
-            </Link>
-          </Button>
+      <div className="flex flex-col gap-8">
+        <div className="text-center space-y-3 max-w-3xl mx-auto">
+          <h1 className="text-4xl font-bold tracking-tight">Student Learning Portal</h1>
+          <p className="text-muted-foreground text-lg">Access your courses, watch lectures, and submit assignments</p>
         </div>
 
         <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-          {assignments.map((assignment) => (
-            <Card key={assignment.id} className="overflow-hidden">
-              <CardHeader className="pb-3">
-                <div className="flex justify-between items-start">
-                  <CardTitle>{assignment.title}</CardTitle>
-                  <Badge variant={getStatusVariant(assignment.status)}>{assignment.status}</Badge>
+          {courses.map((course) => (
+            <Card key={course.id} className="overflow-hidden flex flex-col">
+              <div className="relative h-48 w-full">
+                <Image src={course.image || "https://placehold.co/600x400"} alt={course.title} fill className="object-cover" />
+                <div className="absolute top-2 right-2">
+                  <Badge variant={course.status === "Active" ? "default" : "secondary"}>{course.status}</Badge>
                 </div>
-                <CardDescription className="flex items-center gap-1 mt-1">
-                  <CalendarIcon className="h-3 w-3" />
-                  <span>Due {assignment.dueDate}</span>
+              </div>
+              <CardHeader className="pb-2">
+                <div className="flex justify-between items-start">
+                  <CardTitle className="text-xl">{course.title}</CardTitle>
+                </div>
+                <CardDescription className="flex items-center gap-1">
+                  <GraduationCap className="h-3.5 w-3.5" />
+                  <span>{course.instructor}</span>
                 </CardDescription>
               </CardHeader>
-              <CardContent className="pb-2">
-                <p className="text-sm text-muted-foreground">{assignment.description}</p>
-              </CardContent>
-              <CardFooter className="flex justify-between border-t pt-4">
-                <div className="flex items-center text-xs text-muted-foreground">
-                  <Clock className="mr-1 h-3 w-3" />
-                  {assignment.timeEstimate}
+              <CardContent className="pb-2 flex-grow">
+                <p className="text-sm text-muted-foreground">{course.description}</p>
+
+                <div className="flex flex-wrap gap-4 mt-4">
+                  <div className="flex items-center text-xs text-muted-foreground">
+                    <Video className="mr-1 h-3.5 w-3.5" />
+                    {course.videoCount} videos
+                  </div>
+                  <div className="flex items-center text-xs text-muted-foreground">
+                    <BookOpen className="mr-1 h-3.5 w-3.5" />
+                    {course.assignmentCount} assignments
+                  </div>
+                  <div className="flex items-center text-xs text-muted-foreground">
+                    <Users className="mr-1 h-3.5 w-3.5" />
+                    {course.studentCount} students
+                  </div>
                 </div>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href={`/assignments/${assignment.id}`}>
-                    <FileText className="mr-2 h-3 w-3" />
-                    View Details
-                  </Link>
+              </CardContent>
+              <CardFooter className="pt-2">
+                <Button className="w-full" asChild>
+                  <Link href={`/courses/${course.id}`}>View Course</Link>
                 </Button>
               </CardFooter>
             </Card>
@@ -57,68 +63,71 @@ export default function Home() {
   );
 }
 
-function getStatusVariant(status: string) {
-  switch (status) {
-    case "Pending":
-      return "secondary";
-    case "Submitted":
-      return "default";
-    case "Late":
-      return "destructive";
-    case "Graded":
-      return "outline";
-    default:
-      return "secondary";
-  }
-}
-
-const assignments = [
+const courses = [
   {
-    id: "1",
-    title: "Research Paper",
-    description: "Submit a 5-page research paper on a topic of your choice related to the course material.",
-    dueDate: "March 15, 2025",
-    timeEstimate: "4-6 hours",
-    status: "Pending",
+    id: "cs101",
+    title: "CS101: Introduction to Computer Science",
+    description: "Learn the fundamentals of computer science, including algorithms, data structures, and programming basics.",
+    instructor: "Dr. Alan Turing",
+    status: "Active",
+    videoCount: 24,
+    assignmentCount: 8,
+    studentCount: 156,
+    image: "https://placehold.co/600x400",
   },
   {
-    id: "2",
-    title: "Data Analysis Project",
-    description: "Analyze the provided dataset and submit your findings with visualizations.",
-    dueDate: "March 20, 2025",
-    timeEstimate: "3-5 hours",
-    status: "Submitted",
+    id: "math202",
+    title: "MATH202: Linear Algebra",
+    description: "Study vector spaces, linear transformations, matrices, and their applications in solving systems of linear equations.",
+    instructor: "Dr. Katherine Johnson",
+    status: "Active",
+    videoCount: 18,
+    assignmentCount: 6,
+    studentCount: 124,
+    image: "https://placehold.co/600x400",
   },
   {
-    id: "3",
-    title: "Group Presentation",
-    description: "Prepare a 10-minute presentation with your assigned group on the given topic.",
-    dueDate: "March 10, 2025",
-    timeEstimate: "5-7 hours",
-    status: "Late",
+    id: "eng305",
+    title: "ENG305: Technical Writing",
+    description: "Develop skills in writing clear, concise, and effective technical documents for various professional contexts.",
+    instructor: "Prof. Jane Smith",
+    status: "Active",
+    videoCount: 12,
+    assignmentCount: 10,
+    studentCount: 89,
+    image: "https://placehold.co/600x400",
   },
   {
-    id: "4",
-    title: "Weekly Quiz",
-    description: "Complete the online quiz covering material from weeks 5-6.",
-    dueDate: "March 5, 2025",
-    timeEstimate: "30-45 minutes",
-    status: "Graded",
+    id: "bio220",
+    title: "BIO220: Molecular Biology",
+    description: "Explore the molecular basis of biological activity, including DNA structure, replication, and protein synthesis.",
+    instructor: "Dr. Rosalind Franklin",
+    status: "Active",
+    videoCount: 22,
+    assignmentCount: 7,
+    studentCount: 112,
+    image: "https://placehold.co/600x400",
   },
   {
-    id: "5",
-    title: "Programming Assignment",
-    description: "Implement the algorithms discussed in class and submit your code with documentation.",
-    dueDate: "March 25, 2025",
-    timeEstimate: "6-8 hours",
-    status: "Pending",
+    id: "hist101",
+    title: "HIST101: World History",
+    description: "Survey major events and developments in world history from ancient civilizations to the modern era.",
+    instructor: "Prof. Howard Zinn",
+    status: "Upcoming",
+    videoCount: 20,
+    assignmentCount: 5,
+    studentCount: 78,
+    image: "https://placehold.co/600x400",
   },
   {
-    id: "6",
-    title: "Literature Review",
-    description: "Review and summarize 3 academic papers related to the course topics.",
-    dueDate: "April 1, 2025",
-    timeEstimate: "4-5 hours",
-    status: "Pending",
+    id: "phys301",
+    title: "PHYS301: Quantum Mechanics",
+    description: "Study the fundamental theory of nature at the small scale where classical physics does not apply.",
+    instructor: "Dr. Richard Feynman",
+    status: "Upcoming",
+    videoCount: 16,
+    assignmentCount: 8,
+    studentCount: 64,
+    image: "https://placehold.co/600x400",
   },
 ];

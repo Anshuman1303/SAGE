@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import type React from "react";
+
+import { useState, useRef, ReactElement } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -9,12 +11,18 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, CalendarIcon, Clock, Download, FileText, Upload } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { ArrowLeft, CalendarIcon, Clock, Download, FileText, Upload, X } from "lucide-react";
+import { submitAssignment } from "@/app/actions/submit-assignment";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export default function AssignmentDetails() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Find the assignment by ID (in a real app, this would be a data fetch)
   const assignment = assignments.find((a) => a.id === id) || assignments[0];
@@ -22,22 +30,116 @@ export default function AssignmentDetails() {
   const [activeTab, setActiveTab] = useState("details");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [comments, setComments] = useState("");
+  const [submissionFeedback, setSubmissionFeedback] = useState<ReactElement | null>(null);
+  const [submissionDate, setSubmissionDate] = useState<string | null>(null);
+  const [submittedFileName, setSubmittedFileName] = useState<string | null>(null);
 
-  const handleFileUpload = () => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+
+  const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      setSelectedFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+
+  const clearSelectedFile = () => {
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleFileUpload = async () => {
+    if (!selectedFile) {
+      toast.error("No file selected", {
+        description: "Please select a file to upload",
+      });
+      return;
+    }
+
     setIsUploading(true);
     setUploadProgress(0);
 
+    // Create a FormData object to send the file
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+    formData.append("assignmentId", id);
+    formData.append("comments", comments);
+
     // Simulate upload progress
-    const interval = setInterval(() => {
+    const progressInterval = setInterval(() => {
       setUploadProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsUploading(false);
-          return 100;
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return 90;
         }
         return prev + 10;
       });
     }, 300);
+
+    try {
+      // Submit the assignment using the server action
+      const result = await submitAssignment(formData);
+
+      if (!result.success) {
+        throw new Error(result.error || "Failed to submit assignment");
+      }
+
+      // Complete the progress bar
+      setUploadProgress(100);
+
+      // Update the UI with the submission details
+      setSubmissionFeedback(
+        <>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Question Number</TableHead>
+                <TableHead>Grade</TableHead>
+                <TableHead>Feedback</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(await JSON.parse(result.data.result.response.candidates[0].content.parts[0].text)).map(
+                (item: { questionNumber: string; grade: string; feedback: string }, index: number) => (
+                  <TableRow key={index}>
+                    <TableCell>{item["questionNumber"]}</TableCell>
+                    <TableCell>{item["grade"]}</TableCell>
+                    <TableCell>{item["feedback"]}</TableCell>
+                  </TableRow>
+                )
+              )}
+            </TableBody>
+          </Table>
+        </>
+      );
+      setSubmissionDate(result.data.submissionDate);
+      setSubmittedFileName(result.data.fileName);
+
+      toast("Assignment submitted", {
+        description: "Your assignment has been submitted successfully",
+      });
+
+      // Reset the form
+      setSelectedFile(null);
+      setComments("");
+    } catch (error) {
+      toast.error("Submission failed", { description: error instanceof Error ? error.message : "Failed to submit assignment" });
+    } finally {
+      clearInterval(progressInterval);
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -136,41 +238,81 @@ export default function AssignmentDetails() {
                 <CardDescription>Upload your completed work here</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="border-2 border-dashed rounded-lg p-10 text-center">
+                <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".pdf,.docx,.doc,.zip" />
+
+                <div
+                  className={`border-2 border-dashed rounded-lg p-10 text-center ${selectedFile ? "border-primary" : ""}`}
+                  onDrop={handleFileDrop}
+                  onDragOver={handleDragOver}>
                   {isUploading ? (
                     <div className="space-y-4">
                       <p className="text-sm font-medium">Uploading file...</p>
                       <Progress value={uploadProgress} className="w-full" />
                       <p className="text-xs text-muted-foreground">{uploadProgress}% complete</p>
                     </div>
+                  ) : selectedFile ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-center gap-2">
+                        <FileText className="h-8 w-8 text-primary" />
+                        <span className="text-sm font-medium">{selectedFile.name}</span>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full" onClick={clearSelectedFile}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                    </div>
                   ) : (
                     <>
                       <Upload className="mx-auto h-10 w-10 text-muted-foreground" />
                       <p className="mt-2 text-sm font-medium">Drag and drop your file here, or click to browse</p>
                       <p className="mt-1 text-xs text-muted-foreground">Supports PDF, DOCX, ZIP (max 20MB)</p>
+                      <Button type="button" variant="outline" size="sm" className="mt-4" onClick={() => fileInputRef.current?.click()}>
+                        Select File
+                      </Button>
                     </>
                   )}
                 </div>
 
-                {assignment.status === "Submitted" && (
+                <div className="space-y-2">
+                  <Label htmlFor="comments">Comments (Optional)</Label>
+                  <Textarea
+                    id="comments"
+                    placeholder="Add any comments or notes for your instructor"
+                    value={comments}
+                    onChange={(e) => setComments(e.target.value)}
+                    disabled={isUploading}
+                    rows={4}
+                  />
+                </div>
+
+                {submittedFileName && (
                   <div className="space-y-2 bg-muted p-4 rounded-lg">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
                         <FileText className="mr-2 h-4 w-4" />
-                        <span className="text-sm font-medium">Assignment_Submission.pdf</span>
+                        <span className="text-sm font-medium">{submittedFileName}</span>
                       </div>
                       <Button variant="ghost" size="sm">
                         <Download className="h-4 w-4" />
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground">Submitted on March 18, 2025 at 2:45 PM</p>
+                    <p className="text-xs text-muted-foreground">Submitted on {new Date(submissionDate || "").toLocaleString()}</p>
+                  </div>
+                )}
+
+                {submissionFeedback && (
+                  <div className="bg-muted p-4 rounded-lg">
+                    <p className="text-sm font-medium">Initial AI Feedback</p>
+                    <div className="text-sm text-muted-foreground mt-1">{submissionFeedback}</div>
                   </div>
                 )}
               </CardContent>
               <CardFooter className="flex flex-col sm:flex-row justify-between gap-3">
-                <Button variant="outline">Cancel</Button>
-                <Button onClick={handleFileUpload} disabled={isUploading}>
-                  {isUploading ? "Uploading..." : "Upload Submission"}
+                <Button variant="outline" onClick={() => setActiveTab("details")}>
+                  Back to Details
+                </Button>
+                <Button onClick={handleFileUpload} disabled={isUploading || !selectedFile}>
+                  {isUploading ? "Uploading..." : "Submit Assignment"}
                 </Button>
               </CardFooter>
             </Card>
@@ -233,6 +375,34 @@ export default function AssignmentDetails() {
                       </p>
                     </div>
                   </>
+                ) : submissionFeedback ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-medium">Submitted File</h3>
+                      <Badge variant="secondary">Under Review</Badge>
+                    </div>
+
+                    <div className="space-y-2 bg-muted p-4 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <FileText className="mr-2 h-4 w-4" />
+                          <span className="text-sm font-medium">{submittedFileName}</span>
+                        </div>
+                        <Button variant="ghost" size="sm">
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Submitted on {new Date(submissionDate || "").toLocaleString()}</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-medium">Initial AI Feedback</h3>
+                      <div className="bg-muted p-4 rounded-lg text-sm text-muted-foreground">{submissionFeedback}</div>
+                      <p className="text-xs text-muted-foreground italic">
+                        Note: This is automated feedback. Your instructor will provide detailed feedback soon.
+                      </p>
+                    </div>
+                  </div>
                 ) : (
                   <div className="text-center py-10">
                     <FileText className="mx-auto h-10 w-10 text-muted-foreground" />
